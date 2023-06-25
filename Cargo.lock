@@ -331,28 +331,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "quad-android-playground"
+name = "quad-log-test"
 version = "0.1.0"
 dependencies = [
  "macroquad",
  "once_cell",
- "quad-bt",
-]
-
-[[package]]
-name = "quad-androidx"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9970abf919d9aada4646fa31bb2ada63d40b18401a29b9a477fc75320ab4821b"
-
-[[package]]
-name = "quad-bt"
-version = "0.1.0"
-source = "git+https://github.com/not-fl3/example-android-bluetooth.git#f37acef06b4743f994bfea440d0acddc9227d931"
-dependencies = [
- "miniquad",
- "once_cell",
- "quad-androidx",
 ]
 
 [[package]]

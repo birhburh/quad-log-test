@@ -1,15 +1,83 @@
 use macroquad::{
-    input::utils as input_utils,
-    miniquad,
     prelude::*,
-    ui::{hash, root_ui, widgets},
+    ui::{hash, root_ui},
 };
+use std::str;
 
-#[cfg(target_os = "android")]
-mod bluetooth;
+use macroquad::miniquad::native::android::{self, ndk_sys, ndk_utils};
+use once_cell::sync::Lazy;
+use std::sync::{Arc, Mutex};
 
-#[cfg(target_os = "android")]
-mod fileopen;
+struct GlobalData {
+    openfile: ndk_sys::jobject,
+    data: Option<Arc<Mutex<Option<String>>>>,
+    finish: Option<Arc<Mutex<bool>>>,
+}
+unsafe impl Send for GlobalData {}
+unsafe impl Sync for GlobalData {}
+
+static GLOBALS: Lazy<Mutex<GlobalData>> = Lazy::new(|| {
+    Mutex::new(GlobalData {
+        openfile: std::ptr::null_mut(),
+        data: None,
+        finish: None
+    })
+});
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_rust_quad_1log_1test_FileOpen_init() {
+    let env = android::attach_jni_env();
+
+    let mut globals = GLOBALS.lock().unwrap();
+    let openfile = ndk_utils::new_object!(env, "rust/quad_log_test/FileOpen", "()V");
+    assert!(!openfile.is_null());
+    globals.openfile = ndk_utils::new_global_ref!(env, openfile);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_rust_quad_1log_1test_FileOpen_saveUri(
+    env: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    array: ndk_sys::jbyteArray,
+) {
+    let mut globals = GLOBALS.lock().unwrap();
+
+    let len = ((**env).GetArrayLength.unwrap())(env, array);
+    let elements = ((**env).GetByteArrayElements.unwrap())(env, array, std::ptr::null_mut());
+    let data = std::slice::from_raw_parts(elements as *mut u8, len as usize);
+
+    if let Some(ref mut d) = globals.data {
+        let s = match str::from_utf8(data) {
+            Ok(v) => v.to_string(),
+            Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+        };
+        *d.lock().unwrap() = Some(s);
+    }
+   ((**env).ReleaseByteArrayElements.unwrap())(env, array, elements, 0);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_rust_quad_1log_1test_FileOpen_finish(
+    _: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    _: ndk_sys::jbyteArray,
+) {
+    let mut globals = GLOBALS.lock().unwrap();
+    if let Some(ref mut f) = globals.finish {
+        *f.lock().unwrap() = false;
+    }
+ }
+
+pub fn find_file(data: Arc<Mutex<Option<String>>>, finish: Arc<Mutex<bool>>) {
+    let env = unsafe { android::attach_jni_env() };
+    let mut globals = GLOBALS.lock().unwrap();
+
+    globals.data = Some(data);
+    globals.finish = Some(finish);
+    unsafe {
+        ndk_utils::call_void_method!(env, globals.openfile, "OpenFileDialog", "()V");
+    }
+}
 
 fn window_conf() -> Conf {
     Conf {
@@ -19,89 +87,50 @@ fn window_conf() -> Conf {
     }
 }
 
-fn screen_keyboard(id: usize, characters: &mut Vec<char>) {
-    if widgets::Button::new("Show keyboard")
-        .size(vec2(400., 50.))
-        .ui(&mut *root_ui())
-    {
-        let gl = unsafe { get_internal_gl() };
-        gl.quad_context.show_keyboard(true);
-    }
-
-    if widgets::Button::new("Hide keyboard")
-        .size(vec2(400., 50.))
-        .ui(&mut *root_ui())
-    {
-        let gl = unsafe { get_internal_gl() };
-        gl.quad_context.show_keyboard(false);
-    }
-
-    struct MiniquadInput<'a>(&'a mut Vec<char>);
-
-    impl<'a> miniquad::EventHandler for MiniquadInput<'a> {
-        fn update(&mut self, _ctx: &mut miniquad::Context) {}
-        fn draw(&mut self, _ctx: &mut miniquad::Context) {}
-        fn char_event(
-            &mut self,
-            _ctx: &mut miniquad::Context,
-            character: char,
-            _keymods: miniquad::KeyMods,
-            _repeat: bool,
-        ) {
-            self.0.push(character);
-        }
-    }
-
-    let mut input = MiniquadInput(characters);
-    input_utils::repeat_all_miniquad_input(&mut input, id);
-}
-
 #[macroquad::main(window_conf)]
 async fn main() {
-    #[cfg(target_os = "android")]
-    let mut bluetooth = bluetooth::Bluetooth::new();
-    #[cfg(target_os = "android")]
     let data = std::sync::Arc::new(std::sync::Mutex::new(None));
-    let mut characters = Vec::new();
-    let id = input_utils::register_input_subscriber();
+    let finish = std::sync::Arc::new(std::sync::Mutex::new(false));
 
+    let mut text0 = None;
+    
+    let mut tim = 0;
+    loop
+    {
+        let val = &mut *finish.lock().unwrap();
+        if *val == false
+        {
+            *val = true;
+            find_file(data.clone(), finish.clone());
+        }
+        if let Some(_) = &*data.lock().unwrap() {
+            break;
+        }
+    }
+    
     loop {
         clear_background(WHITE);
+        {
+            if let Some(data_val) = &*data.lock().unwrap() {
+                let mut subtext = String::new();
+                let mut i = 0;
+                for part in data_val.bytes() {
+                    i += 1;
+                    let ar = &[part];
+                    let s = str::from_utf8(ar).unwrap();
+                    subtext.push_str(s);
+                    if i % 20 == 0 {
+                        subtext.push_str("\n");
+                    }
+                }
+                text0=Some(subtext);
+            }
 
-        let tab = root_ui().tabbar(
-            hash!(),
-            vec2(screen_width(), 70.),
-            &["keyboard", "bluetooth", "open file"],
-        );
-        match tab {
-            0 => {
-                screen_keyboard(id, &mut characters);
-                for character in &characters {
-                    root_ui().label(None, &format!("input: {}", character));
-                }
+            let d = data.clone();
+            *d.lock().unwrap() = None;
+            if let Some(ref mut text) = text0 {
+                root_ui().editbox(hash!(), vec2(440., 400.), text);
             }
-            1 => {
-                #[cfg(target_os = "android")]
-                bluetooth.ui();
-            }
-            2 => {
-                #[cfg(target_os = "android")]
-                {
-                    if widgets::Button::new("Load file")
-                        .size(vec2(400., 50.))
-                        .ui(&mut *root_ui())
-                    {
-                        fileopen::find_file(data.clone());
-                    }
-                    if let Some(data) = &*data.lock().unwrap() {
-                        root_ui().label(
-                            None,
-                            &format!("File open, content byte length: {}", data.len()),
-                        );
-                    }
-                }
-            }
-            _ => unreachable!(),
         }
         next_frame().await;
     }

@@ -1,4 +1,7 @@
 main_activity_inject = "java/MainActivity.java"
+
+
 java_files = [
-    "java/playground/FileOpen.java",
+    "java/FileOpen.java",
 ]
+
