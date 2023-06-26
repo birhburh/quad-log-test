@@ -1,7 +1,9 @@
 package TARGET_PACKAGE_NAME;
 
+import android.net.Uri;
+
 public class FileOpen {
-  private Uri saved_uri;
+  public static Uri saved_uri;
   public static MainActivity MainActivity;
 
   public static native void init();
@@ -11,6 +13,10 @@ public class FileOpen {
   static native void finish();
 
   public FileOpen() {}
+
+  public void finishMainActivity() {
+    MainActivity.finish();
+  }
 
   public void OpenFileDialog() {
     MainActivity.OpenFileDialog();

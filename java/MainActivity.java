@@ -12,7 +12,6 @@ import java.io.OutputStreamWriter;
 //% MAIN_ACTIVITY_BODY
 
 private static final int WRITE_REQUEST_CODE = 101;
-private Uri saved_uri;
 
 public void OpenFileDialog() { 
     Intent myIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT, null);
@@ -26,7 +25,7 @@ private void writeInFile(Boolean save, Uri uri, String text) {
 		if (save)
 		{
 			FileOpen.saveUri(uri.toString().getBytes());
-			saved_uri = uri;
+			FileOpen.saved_uri = uri;
 		}
 	getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
 	String mode = save ? "wt" : "wa";
@@ -59,8 +58,8 @@ if (requestCode == WRITE_REQUEST_CODE) {
                 case Activity.RESULT_CANCELED:
                     break;
             }
-	if (saved_uri != null) {
-        	writeInFile(false, saved_uri, "FINISH\n");
+	if (FileOpen.saved_uri != null) {
+        	writeInFile(false, FileOpen.saved_uri, "FINISH\n");
 	}
 	FileOpen.finish();
 }
@@ -71,6 +70,7 @@ if (requestCode == WRITE_REQUEST_CODE) {
 //% MAIN_ACTIVITY_ON_CREATE
 
 FileOpen.MainActivity = this;
+FileOpen.saved_uri = null;
 FileOpen.init();
 
 //% END
