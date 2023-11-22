@@ -13,6 +13,6 @@ name = "android.permission.ACCESS_FINE_LOCATION"
 max_sdk_version = 30
 
 [dependencies]
-macroquad = ">=0.3.24"
+macroquad = "=0.3.24"
 once_cell = "1"
 

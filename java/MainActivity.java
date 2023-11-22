@@ -1,6 +1,7 @@
 //% IMPORTS
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -13,35 +14,29 @@ import java.io.OutputStreamWriter;
 
 private static final int WRITE_REQUEST_CODE = 101;
 
+public static final String PREFS_NAME = "MyPrefsFile";
+
 public void OpenFileDialog() { 
-    Intent myIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT, null);
-    myIntent.setType("text/plain");
-    startActivityForResult(myIntent, WRITE_REQUEST_CODE);
+	SharedPreferences settings = this.getSharedPreferences(PREFS_NAME, 0);
+	String urist = settings.getString("saved_uri", null);
+	Uri uri = null;
+	if (urist != null)
+	{
+		uri = Uri.parse(urist);
+	}
+	FileOpen.saved_uri = uri;
+	if (FileOpen.saved_uri == null) {
+    		Intent myIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT, null);
+    		myIntent.setType("text/plain");
+    		startActivityForResult(myIntent, WRITE_REQUEST_CODE);
+	}
+	else
+	{
+		FileOpen.saveUri(urist.getBytes());
+		FileOpen.writeInFile("WOW\n");
+		// FileOpen.finish();
+	}
 }
-
-private void writeInFile(Boolean save, Uri uri, String text) {
-        OutputStream outputStream;
-        try {
-		if (save)
-		{
-			FileOpen.saveUri(uri.toString().getBytes());
-			FileOpen.saved_uri = uri;
-		}
-	getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-	String mode = save ? "wt" : "wa";
-            outputStream = getContentResolver().openOutputStream(uri, mode);
-            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(outputStream));
-            if (save)
-		    bw.write(text);
-	    else
-		    bw.append(text);
-            bw.flush();
-            bw.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-    }
 //% END
 
 //% MAIN_ACTIVITY_ON_ACTIVITY_RESULT
@@ -52,15 +47,22 @@ if (requestCode == WRITE_REQUEST_CODE) {
                 case Activity.RESULT_OK:
                     if (data != null
                             && data.getData() != null) {
-                        writeInFile(true, data.getData(), "WRITE DATA\n");
+		Uri uri = data.getData();
+		FileOpen.saved_uri = uri;
+		FileOpen.saveUri(uri.toString().getBytes());
+		getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+		SharedPreferences settings = this.getSharedPreferences(PREFS_NAME, 0);
+                SharedPreferences.Editor editor = settings.edit();
+                editor.putString("saved_uri", uri.toString());
+                editor.apply();
+
+                FileOpen.writeInFile("WRITE DATA\n");
                     }
                     break;
                 case Activity.RESULT_CANCELED:
                     break;
             }
-	if (FileOpen.saved_uri != null) {
-        	writeInFile(false, FileOpen.saved_uri, "FINISH\n");
-	}
+        FileOpen.writeInFile("FINISH\n");
 	FileOpen.finish();
 }
 //% END
@@ -70,8 +72,7 @@ if (requestCode == WRITE_REQUEST_CODE) {
 //% MAIN_ACTIVITY_ON_CREATE
 
 FileOpen.MainActivity = this;
-FileOpen.saved_uri = null;
 FileOpen.init();
-
+FileOpen.resolver = getContentResolver();
 //% END
 

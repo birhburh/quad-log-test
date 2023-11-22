@@ -1,7 +1,4 @@
-use macroquad::{
-    prelude::*,
-    ui::{hash, root_ui},
-};
+use macroquad::prelude::*;
 use std::str;
 
 use macroquad::miniquad::native::android::{self, ndk_sys, ndk_utils};
@@ -53,6 +50,7 @@ pub unsafe extern "C" fn Java_rust_quad_1log_1test_FileOpen_saveUri(
         };
         *d.lock().unwrap() = Some(s);
     }
+
     ((**env).ReleaseByteArrayElements.unwrap())(env, array, elements, 0);
 }
 
@@ -79,12 +77,16 @@ fn finish_main_activity() {
 
 fn find_file(data: Arc<Mutex<Option<String>>>, finish: Arc<Mutex<bool>>) {
     let env = unsafe { android::attach_jni_env() };
-    let mut globals = GLOBALS.lock().unwrap();
+    let openfile;
+    {
+        let mut globals = GLOBALS.lock().unwrap();
 
-    globals.data = Some(data);
-    globals.finish = Some(finish);
+        globals.data = Some(data);
+        globals.finish = Some(finish);
+        openfile = globals.openfile;
+    }
     unsafe {
-        ndk_utils::call_void_method!(env, globals.openfile, "OpenFileDialog", "()V");
+        ndk_utils::call_void_method!(env, openfile, "OpenFileDialog", "()V");
     }
 }
 
@@ -99,14 +101,18 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     let mut exit = false;
-    let data = std::sync::Arc::new(std::sync::Mutex::new(None));
-    let finish = std::sync::Arc::new(std::sync::Mutex::new(false));
+    let data = Arc::new(Mutex::new(None));
+    let finish = Arc::new(Mutex::new(false));
     let mut first = true;
-    let mut text0 = None;
 
     loop {
-        let val = &mut *finish.lock().unwrap();
+        let ref mut val = *finish.lock().unwrap();
+        // not call new find_file until
+        // current is not closed
         if *val == false {
+            // if find_file returned and
+            // there is no data set
+            // close activity
             if !first {
                 exit = true;
                 break;
@@ -115,38 +121,24 @@ async fn main() {
             first = false;
             find_file(data.clone(), finish.clone());
         }
-        if let Some(_) = &*data.lock().unwrap() {
+        if let Some(_) = *data.lock().unwrap() {
             break;
         }
     }
 
+    let mut text0 = "".to_string();
     loop {
         clear_background(WHITE);
         if exit {
             finish_main_activity();
         }
-        {
-            if let Some(data_val) = &*data.lock().unwrap() {
-                let mut subtext = String::new();
-                let mut i = 0;
-                for part in data_val.bytes() {
-                    i += 1;
-                    let ar = &[part];
-                    let s = str::from_utf8(ar).unwrap();
-                    subtext.push_str(s);
-                    if i % 20 == 0 {
-                        subtext.push_str("\n");
-                    }
-                }
-                text0 = Some(subtext);
-            }
 
-            let d = data.clone();
-            *d.lock().unwrap() = None;
-            if let Some(ref mut text) = text0 {
-                root_ui().editbox(hash!(), vec2(440., 400.), text);
-            }
+        let ref mut v = *data.lock().unwrap(); 
+        if let Some(v) = v {
+            text0 = v.clone();
         }
+        *v = None;
+        draw_text(&text0, 10., 10., 20., BLACK);
         next_frame().await;
     }
 }
