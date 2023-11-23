@@ -5,6 +5,7 @@ edition = "2021"
 
 [package.metadata.android]
 res = "android_res"
+assets = "android_assets"
 icon = "@mipmap/ic_launcher"
 label = "LOG TEST"
 min_sdk_version = 26

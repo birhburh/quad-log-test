@@ -1,11 +1,10 @@
 # My Quad playground
 
+![Open log file](img/img1.jpg?raw=true "Open log file on start")
+![Log is written](img/img2.jpg?raw=true "Log is written")
+![hello ferris](img/img3.jpg?raw=true "Hello, ferris!")
+
 I added:
 - Add custom log to file without adb on non-rooted phone
-
-I want:
 - Load texture from resource on android
-    - make examples/texture.rs from macroquad work on android
-- Learn more rust :)
-- Make simple tamagotchi-like game
 

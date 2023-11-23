@@ -169,20 +169,34 @@ async fn main() {
         }
     }
 
-    log_this("I AM STARTING, MR KRABS!\n");
     let mut text0 = "".to_string();
+    log_this("I AM STARTING, MR KRABS!\n");
+
+    let texture = load_texture("ferris.png").await.unwrap();
+    let mut start = get_time();
     loop {
         clear_background(WHITE);
         if exit {
             finish_main_activity();
         }
 
-        let ref mut v = *data.lock().unwrap();
-        if let Some(v) = v {
-            text0 = v.clone();
+        {
+            let ref mut v = *data.lock().unwrap();
+            if let Some(v) = v {
+                text0 = v.clone();
+            }
+            *v = None;
         }
-        *v = None;
         draw_text(&text0, 10., 10., 20., BLACK);
+        draw_texture(
+            texture,
+            screen_width() / 2. - texture.width() / 2.,
+            screen_height() / 2. - texture.height() / 2.,
+            WHITE,
+        );
+        log_this(&format!("TIME: {}\n", get_time() - start));
+        start = get_time();
+
         next_frame().await;
     }
 }
