@@ -29,6 +29,10 @@ public class FileOpen {
     MainActivity.OpenFileDialog();
   }
 
+  public void logThis(String text) {
+	  FileOpen.writeInFile(text);
+  }
+
   public static void writeInFile(String text) {
     if (saved_uri != null) {
       OutputStream outputStream;

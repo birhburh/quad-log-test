@@ -1,7 +1,12 @@
 use macroquad::prelude::*;
+use std::ffi::CString;
 use std::str;
 
-use macroquad::miniquad::native::android::{self, ndk_sys, ndk_utils};
+use macroquad::miniquad::native::android::{
+    self,
+    ndk_sys::{self},
+    ndk_utils,
+};
 use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
 
@@ -90,6 +95,44 @@ fn find_file(data: Arc<Mutex<Option<String>>>, finish: Arc<Mutex<bool>>) {
     }
 }
 
+use std::panic;
+
+fn log_this(s: &str) {
+    let env = unsafe { android::attach_jni_env() };
+    let mut globals = GLOBALS.lock().unwrap();
+
+    unsafe {
+        let c_string = CString::new(s).expect("CString conversion failed");
+        let java_arg = (**env).NewStringUTF.unwrap()(env, c_string.as_ptr());
+        let r = panic::catch_unwind(|| {
+            ndk_utils::call_void_method!(
+                env,
+                globals.openfile,
+                "logThis",
+                "(Ljava/lang/String;)V",
+                java_arg
+            );
+        });
+
+        if let Some(ref mut d) = globals.data {
+            let s = match r {
+                Ok(_) => "No panic".to_string(),
+                Err(e) => {
+                    if let Some(msg) = e.downcast_ref::<&str>() {
+                        format!("Panic occurred: {}", msg)
+                    } else if let Some(msg) = e.downcast_ref::<String>() {
+                        format!("Panic occurred: {}", msg)
+                    } else {
+                        "Unknown panic occurred".to_string()
+                    }
+                }
+            };
+            *d.lock().unwrap() = Some(s);
+        }
+        (**env).DeleteLocalRef.unwrap()(env, java_arg as *mut _);
+    }
+}
+
 fn window_conf() -> Conf {
     Conf {
         window_title: "Quad!".to_owned(),
@@ -126,6 +169,7 @@ async fn main() {
         }
     }
 
+    log_this("I AM STARTING, MR KRABS!\n");
     let mut text0 = "".to_string();
     loop {
         clear_background(WHITE);
@@ -133,7 +177,7 @@ async fn main() {
             finish_main_activity();
         }
 
-        let ref mut v = *data.lock().unwrap(); 
+        let ref mut v = *data.lock().unwrap();
         if let Some(v) = v {
             text0 = v.clone();
         }
